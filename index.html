@@ -219,6 +219,9 @@
                         </select>
                     </div>
                     <button id="addNewLangButton" class="btn-secondary py-2 px-3 rounded-md font-semibold text-sm whitespace-nowrap"><i class="fas fa-plus-circle mr-1"></i> สร้างภาษาใหม่</button>
+                    <button id="deleteLangButton" class="btn-secondary py-2 px-3 rounded-md font-semibold text-sm whitespace-nowrap">
+    <i class="fas fa-trash-alt mr-1"></i> ลบภาษา
+</button>
                     <button id="aboutButton" class="btn-secondary py-2 px-3 rounded-md font-semibold text-sm hidden sm:inline-block">📜 เกี่ยวกับ</button>
                 </div>
             </div>
@@ -487,7 +490,29 @@
                 switchTab(activeTab);
             }
         };
-        
+        const deleteLangButton = document.getElementById('deleteLangButton');
+deleteLangButton.addEventListener('click', () => {
+    if (!currentLanguage.name) {
+        alert("ไม่มีภาษาที่กำลังใช้งานอยู่");
+        return;
+    }
+    const confirmDelete = confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบภาษา "${currentLanguage.name}"? ข้อมูลทั้งหมดจะหายไป`);
+    if (confirmDelete) {
+        // ลบออกจาก allLanguages
+        allLanguages = allLanguages.filter(lang => lang.name !== currentLanguage.name);
+
+        // เคลียร์ currentLanguage
+        currentLanguage = ensureDeepStructure({}, DEFAULT_LANGUAGE_STATE);
+
+        // บันทึกและอัปเดต UI
+        localStorage.setItem('allLanguagesData', JSON.stringify(allLanguages));
+        localStorage.removeItem('currentLanguageData');
+
+        renderLanguageSelector();
+        updateUI();
+    }
+});
+
         function ensureDeepStructure(langData, defaultStructure) {
             const newLangData = JSON.parse(JSON.stringify(defaultStructure)); 
         
