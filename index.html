@@ -119,12 +119,16 @@
             color: #6b7280; /* gray-500 */
             display: block; margin-top:2px;
         }
-         .grapheme-mapping-display .mapping-values {
-             font-family: monospace;
-             background-color: #f3f4f6; /* gray-100 */
-             padding: 2px 4px;
-             border-radius: 3px;
-         }
+        .grapheme-mapping-display .mapping-values-container { /* Container for multiple value items */
+            font-family: monospace;
+        }
+        .grapheme-mapping-display .mapping-values-container .mapping-value-item { /* Individual grapheme item */
+            background-color: #d8b4fe; /* Light purple */
+            padding: 1px 3px;
+            border-radius: 3px;
+            font-family: monospace; /* Ensure monospace is inherited or set */
+            margin: 0 1px; /* Optional: space between items */
+        }
         .rule-step-item { /* Style for individual rule steps */
             transition: background-color 0.2s ease-in-out;
         }
@@ -136,7 +140,6 @@
         .inflection-category-bg-0 { background-color: #f3e8ff; } /* Light Lavender */
         .inflection-category-bg-1 { background-color: #e9d5ff; } /* Lighter Purple */
         .inflection-category-bg-2 { background-color: #ddd6fe; } /* Even Lighter Purple */
-
 
     </style>
 </head>
@@ -238,7 +241,7 @@
             <p>______________________________________________________________</p>
             <p>อยู่ระหว่างการพัฒนาระบบ ระบบอาจมีการหน่วงหรือช้าบ้าง ก็ขออภัยมา ณ ที่นี้ด้วย</p>
               <p>เมื่อเข้าสู่เว็ปไซต์ ให้รอระบบทำการโหลดข้อมูล ประมาณ 20 วินาที</p>
-             <p>เวอร์ชั่นต้นแบบ: <a href="https://arthur2548.github.io/conlang-/" target="_blank" class="hover:underline">arthur2548.github.io/conlang</a></p>  
+             <p>เวอร์ชั่นต้นแบบ: <a href="https://arthur2548.github.io/conlang-/" target="_blank" class="hover:underline">https://arthur2548.github.io/conlang-/</a></p>  
             <p>ติดต่อ: <a href="https://kruarthurclassroom.blogspot.com/" target="_blank" class="hover:underline">kruarthurclassroom.blogspot.com</a></p>
             <p>© 2025-2026 All Rights Reserved</p>
         </footer>
@@ -281,7 +284,7 @@
                     { rule: "ห้ามพยัญชนะซ้อนภายในโครงสร้างพยางค์หลัก (เช่น CVC ห้ามเป็น CCVC)", type: "no_internal_cluster_in_base_syllable", enabled: true, custom: false, pattern: "" },
                 ]
             },
-            lexicon: [], // Words will have id, word (base phonemic form), customOrthography (optional), phonetics (detailed IPA), meaning, pos, etymology, evolutionTimeline, dialectalForms, manualInflections
+            lexicon: [], // Words will have id, word (base phonemic form), customOrthography (optional), phonetics (detailed IPA), meaning, pos, gender, etymology, evolutionTimeline, dialectalForms, manualInflections
             grammar: {
                 sentenceStructure: 'SVO',
                 partsOfSpeech: ['Noun', 'Verb', 'Adjective', 'Adverb', 'Pronoun', 'Preposition', 'Conjunction', 'Interjection', 'Particle', 'Determiner'], 
@@ -612,19 +615,18 @@
 
 
             newLangData.lexicon = (newLangData.lexicon || []).map(word => ({
-                // ...DEFAULT_LANGUAGE_STATE.lexicon[0], // This was problematic as lexicon[0] is not defined.
-                                                        // Instead, ensure specific word properties exist.
-                id: word.id || 0, // Default ID to 0 if missing, will be updated by calculateNextWordId
+                id: word.id || 0, 
                 word: word.word || '',
                 customOrthography: word.customOrthography || null,
                 phonetics: word.phonetics || '',
                 meaning: word.meaning || '',
                 partOfSpeech: word.partOfSpeech || '',
+                gender: word.gender || '', // Added gender field
                 etymology: word.etymology || { roots: [], notes: '' },
                 evolutionTimeline: word.evolutionTimeline || [],
                 dialectalForms: word.dialectalForms || [],
                 manualInflections: word.manualInflections || {},
-                ...word // Spread the original word to keep any other properties
+                ...word 
             }));
             
             newLangData.grammar = newLangData.grammar || { ...defaultStructure.grammar };
@@ -1809,6 +1811,12 @@
             const listContainer = document.getElementById('graphemeMappingListPhonology');
             if (!listContainer) return;
             listContainer.innerHTML = '';
+
+            const createGraphemeSpans = (graphemes) => {
+                if (!graphemes || graphemes.length === 0) return 'N/A';
+                return graphemes.map(g => `<span class="mapping-value-item">${g}</span>`).join(', ');
+            };
+        
             (currentLanguage.phonology.graphemeMappings || []).forEach((gm, index) => {
                 const div = document.createElement('div');
                 div.className = 'grapheme-mapping-display text-sm'; 
@@ -1819,13 +1827,13 @@
                     (gm.vowelGraphemes && gm.vowelGraphemes.length > 0)) {
                     content += `<div class="ml-4">`;
                     if (gm.initialGraphemes && gm.initialGraphemes.length > 0) {
-                        content += `<span class="mapping-type">พยัญชนะต้น:</span> <span class="mapping-values">${gm.initialGraphemes.join(', ')}</span><br>`;
+                        content += `<span class="mapping-type">พยัญชนะต้น:</span> <span class="mapping-values-container">${createGraphemeSpans(gm.initialGraphemes)}</span><br>`;
                     }
                     if (gm.finalGraphemes && gm.finalGraphemes.length > 0) {
-                        content += `<span class="mapping-type">พยัญชนะท้าย:</span> <span class="mapping-values">${gm.finalGraphemes.join(', ')}</span><br>`;
+                        content += `<span class="mapping-type">พยัญชนะท้าย:</span> <span class="mapping-values-container">${createGraphemeSpans(gm.finalGraphemes)}</span><br>`;
                     }
                     if (gm.vowelGraphemes && gm.vowelGraphemes.length > 0) {
-                        content += `<span class="mapping-type">สระ/ทั่วไป:</span> <span class="mapping-values">${gm.vowelGraphemes.join(', ')}</span>`;
+                        content += `<span class="mapping-type">สระ/ทั่วไป:</span> <span class="mapping-values-container">${createGraphemeSpans(gm.vowelGraphemes)}</span>`;
                     }
                     content += `</div>`;
                 } else {
@@ -2175,30 +2183,30 @@
                 }
             } else if (writingSystem === 'latin' && graphemeMappings && graphemeMappings.length > 0) {
                 const sortedMappings = [...graphemeMappings].sort((a, b) => b.sound.length - a.sound.length);
-                let currentOriginalPos = 0; // Track position in the original baseWord (before tone removal)
+                let currentOriginalPos = 0; 
                 
                 while (remainingWord.length > 0) {
                     let foundMatch = false;
                     for (const gm of sortedMappings) {
                         if (remainingWord.startsWith(gm.sound)) {
                             let graphemesToUse = [];
-                            // Determine context (initial, final, vowel)
                             const isInitial = currentOriginalPos === 0;
-                            const isFinal = (currentOriginalPos + gm.sound.length === baseWord.length); // Compare with length of baseWord (phonemes only)
+                            const isFinal = (currentOriginalPos + gm.sound.length === baseWord.length); 
                             const isVowelSound = vowels.includes(gm.sound);
 
                             if (isInitial && gm.initialGraphemes && gm.initialGraphemes.length > 0) {
                                 graphemesToUse = gm.initialGraphemes;
-                            } else if (isFinal && gm.finalGraphemes && gm.finalGraphemes.length > 0 && !isVowelSound) { // Final graphemes usually for consonants
+                            } else if (isFinal && gm.finalGraphemes && gm.finalGraphemes.length > 0 && !isVowelSound) {
                                 graphemesToUse = gm.finalGraphemes;
                             } else if (isVowelSound && gm.vowelGraphemes && gm.vowelGraphemes.length > 0) { 
                                 graphemesToUse = gm.vowelGraphemes;
-                            } else { // Fallback: try any defined grapheme for the sound
+                            } else { 
                                  graphemesToUse = [...(gm.vowelGraphemes || []), ...(gm.initialGraphemes || []), ...(gm.finalGraphemes || [])].filter(Boolean);
                             }
                             
                             if (graphemesToUse.length > 0) {
-                                transliterated += graphemesToUse[0]; // Use the first grapheme in the list
+                                // MODIFIED: Randomly pick one grapheme
+                                transliterated += graphemesToUse[Math.floor(Math.random() * graphemesToUse.length)];
                                 remainingWord = remainingWord.substring(gm.sound.length);
                                 currentOriginalPos += gm.sound.length; 
                                 foundMatch = true;
@@ -2206,13 +2214,13 @@
                             }
                         }
                     }
-                    if (!foundMatch) { // No specific mapping, use the phoneme itself
+                    if (!foundMatch) { 
                         transliterated += remainingWord[0];
                         remainingWord = remainingWord.substring(1);
                         currentOriginalPos += 1;
                     }
                 }
-            } else { // No custom symbols or grapheme mappings, or writingSystem is not 'latin'/'custom'
+            } else { 
                 transliterated = baseWord;
             }
         
@@ -2234,21 +2242,15 @@
             for (let i = 0; i < numWords; i++) {
                 const numSyllToGenerate = Math.floor(Math.random() * (maxSyllables - minSyllables + 1)) + minSyllables;
                 let rawWordFormBeforeActiveChanges = ''; 
-                let finalPhoneticWord = ''; // This will include tone markers from generateSyllable
-                // let phoneticSyllablesArray = []; // Not currently used, but could be for detailed breakdown
+                let finalPhoneticWord = ''; 
 
                 for (let j = 0; j < numSyllToGenerate; j++) {
                     const syllableParts = generateSyllable(); 
                     rawWordFormBeforeActiveChanges += syllableParts.base; 
-                    finalPhoneticWord += syllableParts.phonetic; // syllableParts.phonetic already includes tone
-                    // phoneticSyllablesArray.push(syllableParts.phonetic.replace(/[.¹²³⁴⁵⁶⁷⁸⁹]$/, '')); 
+                    finalPhoneticWord += syllableParts.phonetic; 
                 }
                 
-                // finalPhoneticWord is the complete phonemic representation including tones.
-                // autoFormatDetailedPhonetics will then format this into /syllable.syllable/
                 const detailedPhonetics = autoFormatDetailedPhonetics(finalPhoneticWord, currentLanguage.phonology);
-                
-                // transliterateWordToSymbols will take finalPhoneticWord (which includes tones) and produce orthography
                 const displayWord = transliterateWordToSymbols(finalPhoneticWord); 
 
                 let randomMeaning = "";
@@ -2272,7 +2274,6 @@
                 const addButton = document.createElement('button');
                 addButton.innerHTML = '➕ <span class="hidden sm:inline">เพิ่มในพจนานุกรม</span>';
                 addButton.className = 'ml-auto text-xs btn-secondary bg-green-400 hover:bg-green-500 px-2 py-1 rounded whitespace-nowrap';
-                // Pass finalPhoneticWord (which has tones) as the base word for the modal
                 addButton.onclick = () => showWordModal(null, finalPhoneticWord, detailedPhonetics, randomMeaning); 
                 listItem.appendChild(addButton);
                 listElement.appendChild(listItem);
