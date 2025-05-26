@@ -256,15 +256,15 @@
             name: '',
             parentLangName: null,
             phonology: {
-                consonants: ['p', 't', 'k', 'b', 'd', 'g', 'm', 'n', 'ŋ', 's', 'z', 'ʃ', 'h', 'l', 'r', 'j', 'w'],
-                vowels: ['a', 'e', 'i', 'o', 'u', 'ə', 'æ', 'ɔ'],
+                consonants: ['p', 't', 'k'],
+                vowels: ['a', 'e', 'i', 'o', 'u'],
                 
                 allowedInitialConsonants: [], 
-                allowVowelInitial: true,
+                allowVowelInitial: false,
                 forbiddenInitialSounds: [],
 
-                allowedConsonantClusters: ["pr", "pl", "tr", "kl", "kr", "sp", "st", "sk"], 
-                forbiddenConsonantClusters: ["tl", "dl"],
+                allowedConsonantClusters: [], 
+                forbiddenConsonantClusters: [],
                 maxClusterLength: 2,
 
                 allowedFinalConsonants: [], 
@@ -282,7 +282,7 @@
                 
                 activeSoundChanges: [], 
 
-                syllableStructures: ['CV', 'CVC', 'CCV', 'CVCC'],
+                syllableStructures: ['CV', 'CVC', 'CCV', 'CCVC'],
                 phonotactics: [ 
                     { rule: "ห้ามพยัญชนะซ้อนภายในโครงสร้างพยางค์หลัก (เช่น CVC ห้ามเป็น CCVC)", type: "no_internal_cluster_in_base_syllable", enabled: true, custom: false, pattern: "" },
                 ]
@@ -290,13 +290,13 @@
             lexicon: [], // Words will have id, word (base phonemic form), customOrthography (optional), phonetics (detailed IPA), meaning, pos, gender, etymology, evolutionTimeline, dialectalForms, manualInflections
             grammar: {
                 sentenceStructure: 'SVO',
-                partsOfSpeech: ['Noun', 'Verb', 'Adjective', 'Adverb', 'Pronoun', 'Preposition', 'Conjunction', 'Interjection', 'Particle', 'Determiner'], 
+                partsOfSpeech: ['นาม', 'กริยา', 'วิเศษณ์', 'คุณศัพท์', 'สรรพนาม', 'สันธาน', 'บุพบท', 'อุทาน', ], 
                 hasGender: false,
-                genders: ['Masculine', 'Feminine', 'Neuter'],
+                genders: ['ปุงลิงค์', 'อิตถีลิงค์', 'นปุงสกลิงค์'],
                 morphology: {
                     conjugationCategories: [
-                        { id: 'cat_tense', name: 'Tense', appliesToPOS: ['Verb'], options: ['Past', 'Present', 'Future'] },
-                        { id: 'cat_number', name: 'Number', appliesToPOS: ['Noun', 'Verb'], options: ['Singular', 'Plural'] }
+                        { id: 'cat_tense', name: 'กาล', appliesToPOS: ['กริยา'], options: ['อดีตกาล', 'ปัจจุบันกาล', 'อนาคตกาล'] },
+                        { id: 'cat_number', name: 'พจน์', appliesToPOS: ['นาม', 'กริยา'], options: ['เอกพจน์', 'พหูพจน์'] }
                     ],
                     conjugationRules: [], // Each rule now has ruleSteps: [{id, order, ruleType, ruleValue}]
                     nounPluralization: { 
@@ -325,7 +325,7 @@
                 { id: 'era_old', name: 'Old Period', order: 1, soundChangeRules: [] },
                 { id: 'era_modern', name: 'Modern Period', order: 2, soundChangeRules: [] }
             ],
-            regions: ['Standard', 'Northern', 'Southern', 'Eastern', 'Western'], 
+            regions: ['Standard', 'ถิ่นเหนือ', 'ถิ่นใต้', 'ถิ่นตะวันออก', 'ถิ่นตะวันตก'], 
             dialectSoundChanges: {}, 
             languageFamily: { 
                 externalNodes: [] 
@@ -3917,7 +3917,7 @@ deleteLangButton.addEventListener('click', () => {
                 }
             }
 
-            const initialPartOfSpeech = existingWord ? existingWord.partOfSpeech : (currentLanguage.grammar.partsOfSpeech[0] || 'Noun');
+            const initialPartOfSpeech = existingWord ? existingWord.partOfSpeech : (currentLanguage.grammar.partsOfSpeech[0] || 'นาม');
             const initialGender = existingWord ? existingWord.gender : (currentLanguage.grammar.hasGender && currentLanguage.grammar.genders.length > 0 ? currentLanguage.grammar.genders[0] : '');
             const initialExample = existingWord ? existingWord.example : '';
             const initialSynonyms = existingWord && existingWord.synonyms ? existingWord.synonyms.join(', ') : '';
@@ -3949,7 +3949,7 @@ deleteLangButton.addEventListener('click', () => {
                             <select id="modalPartOfSpeech" class="w-full p-2 border rounded-md">${posOptionsHtml}</select>
                         </div>
                         ${currentLanguage.grammar.hasGender ? `
-                        <div id="modalGenderSection" class="${initialPartOfSpeech.toLowerCase().includes('noun') ? '' : 'hidden'}">
+                        <div id="modalGenderSection" class="${initialPartOfSpeech.toLowerCase().includes('นาม') ? '' : 'hidden'}">
                             <label class="block text-sm font-medium">เพศ:</label>
                             <select id="modalGender" class="w-full p-2 border rounded-md">${genderOptionsHtml}</select>
                         </div>` : ''}
@@ -3985,7 +3985,7 @@ deleteLangButton.addEventListener('click', () => {
             const modalGenderSection = modal.querySelector('#modalGenderSection');
             if (modalPosSelect && modalGenderSection) {
                 modalPosSelect.onchange = (e) => {
-                    modalGenderSection.classList.toggle('hidden', !e.target.value.toLowerCase().includes('noun'));
+                    modalGenderSection.classList.toggle('hidden', !e.target.value.toLowerCase().includes('นาม'));
                 };
             }
 
@@ -5722,10 +5722,10 @@ deleteLangButton.addEventListener('click', () => {
                 if (candidates.length === 0) {
                     candidates = currentLanguage.lexicon.filter(w => w.partOfSpeech.toLowerCase().startsWith(targetPOS.toLowerCase()));
                 }
-                 if (candidates.length === 0 && targetPOS.toLowerCase() === 'noun') { 
+                 if (candidates.length === 0 && targetPOS.toLowerCase() === 'นาม') { 
                     candidates = currentLanguage.lexicon;
                 }
-                if (candidates.length === 0 && targetPOS.toLowerCase() === 'verb') { 
+                if (candidates.length === 0 && targetPOS.toLowerCase() === 'กริยา') { 
                     candidates = currentLanguage.lexicon;
                 }
                 if (candidates.length > 0) return candidates[Math.floor(Math.random() * candidates.length)];
@@ -5734,8 +5734,8 @@ deleteLangButton.addEventListener('click', () => {
 
             for (const part of structure) { 
                 let wordEntry = null;
-                if (part === 'S' || part === 'O') wordEntry = getWordByPOS('noun');
-                else if (part === 'V') wordEntry = getWordByPOS('verb');
+                if (part === 'S' || part === 'O') wordEntry = getWordByPOS('นาม');
+                else if (part === 'V') wordEntry = getWordByPOS('กริยา');
                 
                 if (wordEntry) {
                     let wordForm = wordEntry.word;
