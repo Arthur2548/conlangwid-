@@ -1558,6 +1558,7 @@ deleteLangButton.addEventListener('click', () => {
             graphemeMappingSection.className = 'mb-6 p-4 border border-purple-300 rounded-lg bg-purple-50';
             graphemeMappingSection.innerHTML = `<h4 class="text-lg font-semibold text-purple-700 mb-3">5. การจับคู่เสียงกับรูปอักขรวิธี (Grapheme Mappings)</h4>
                 <p class="text-xs text-gray-500 mb-2">ใช้สำหรับกำหนดวิธีเขียนเสียงต่างๆ โดยเฉพาะเมื่อใช้ระบบอักษรละตินแต่มีการสะกดแบบเฉพาะเจาะจง หรือเมื่อเสียงหนึ่งมีหลายรูปเขียน</p>
+                <p class="text-xs text-gray-500 mb-2">เมื่อระบบแปลงเสียงเป็นตัวอักษร (transliterate) สำหรับพยัญชนะ จะพยายามเลือกรูปเขียนที่กำหนดไว้สำหรับตำแหน่งต้นคำ (Initial) หรือท้ายคำ (Final) ก่อน หากไม่มีการกำหนดเฉพาะตำแหน่ง หรือเป็นพยัญชนะกลางคำ จะใช้รูปเขียนสำหรับต้นคำเป็นหลัก (ถ้ามี) เพื่อความสม่ำเสมอ สำหรับเสียงสระ จะใช้รูปเขียนสำหรับสระ (Vowel) ที่กำหนดไว้ การสุ่มเลือกรูปเขียนจะทำจากกลุ่มที่เหมาะสมกับตำแหน่งและประเภทเสียงนั้นๆ โดยไม่นำรูปเขียนของพยัญชนะต้นมาปนกับรูปเขียนของพยัญชนะท้ายในการสุ่มสำหรับตำแหน่งนั้นๆ</p>
                 <div id="graphemeMappingListPhonology" class="space-y-3 mb-3 max-h-72 overflow-y-auto p-2 bg-white rounded"></div>
                 <div class="flex flex-wrap gap-2 items-end p-2 border bg-purple-100 rounded">
                     <div class="flex-grow min-w-[100px]"><label class="text-xs">เสียง (Phoneme):</label><input type="text" id="graphemeMapSoundPhonology" placeholder="เช่น k, a" class="w-full p-1 border rounded text-sm" list="${phonemeDatalistId}"></div>
@@ -2133,18 +2134,28 @@ deleteLangButton.addEventListener('click', () => {
             document.getElementById('generateWordsButton').addEventListener('click', generateAndDisplayWords);
         }
 
-        function getOrthographicForm(wordEntry, forDisplay = true) {
+        // Function to get orthographic form, with an option to use the first grapheme for deterministic output
+        // (e.g., for consistent display in inflection tables)
+        function getOrthographicForm(wordEntry, forDisplay = true, useFirstGraphemeForAutoInflection = false) {
             if (!wordEntry) return "";
+            // If a custom orthography is defined for the word, always use it.
             if (wordEntry.customOrthography) {
                 return wordEntry.customOrthography;
             }
-            // wordEntry.word is expected to be the base phonemic form *including* any tone markers
+            // Otherwise, transliterate the base phonemic form.
+            // wordEntry.word is expected to be the base phonemic form including any tone markers.
             const basePhonemicForm = typeof wordEntry.word === 'string' ? wordEntry.word : '';
-            return transliterateWordToSymbols(basePhonemicForm, forDisplay);
+            // Pass the useFirstGraphemeForAutoInflection flag to transliterateWordToSymbols.
+            return transliterateWordToSymbols(basePhonemicForm, forDisplay, useFirstGraphemeForAutoInflection);
         }
 
 
-        function transliterateWordToSymbols(wordString, forDisplay = true) {
+        // Function to transliterate a phonemic word string into its orthographic representation based on current language settings.
+        // Parameters:
+        // - wordString: The phonemic string to transliterate.
+        // - forDisplay: Boolean, if true, considers displayTonesInOrthography. (Currently always true when called from getOrthographicForm)
+        // - useFirstGraphemeOnly: Boolean, if true, selects the first available grapheme from mappings for determinism. Otherwise, selects randomly.
+        function transliterateWordToSymbols(wordString, forDisplay = true, useFirstGraphemeOnly = false) {
             if (!wordString && typeof wordString !== 'string') return ""; 
             const { writingSystem, customSymbols, displayTonesInOrthography } = currentLanguage.orthography;
             const { graphemeMappings, tones: definedTones, hasTones, consonants, vowels } = currentLanguage.phonology;
@@ -2152,23 +2163,24 @@ deleteLangButton.addEventListener('click', () => {
             let baseWord = String(wordString);
             let toneMarker = "";
         
-            // Extract tone from the end of the phonemic string
+            // Extract tone from the end of the phonemic string if tones are enabled and defined.
             if (hasTones && definedTones && definedTones.length > 0) {
                 const numericSuperscripts = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
-                // Check for complex tone representations first (e.g., "HL", "¹³")
+                // Sort tone representations by length (longest first) to handle multi-character representations correctly.
                 const toneRepresentationsSorted = definedTones
                     .map(t => ({rep: t.representation, tone: t}))
                     .filter(item => item.rep && typeof item.rep === 'string') 
-                    .sort((a,b) => b.rep.length - a.rep.length); // Sort by length, longest first
+                    .sort((a,b) => b.rep.length - a.rep.length); 
 
                  for (const item of toneRepresentationsSorted) {
                     if (item.rep && baseWord.endsWith(item.rep)) { 
+                        // Assign tone marker if forDisplay is true, displayTonesInOrthography is true, and tone is not hidden.
                         toneMarker = (forDisplay && displayTonesInOrthography && !item.tone.hideInOrthography) ? item.rep : "";
-                        baseWord = baseWord.slice(0, -item.rep.length);
+                        baseWord = baseWord.slice(0, -item.rep.length); // Remove tone from baseWord
                         break;
                     }
                 }
-                // If no complex tone found, check for simple numeric superscript
+                // If no complex tone found, check for simple numeric superscript.
                 if (!toneMarker) {
                     for (let i = 0; i < numericSuperscripts.length; i++) {
                         if (baseWord.endsWith(numericSuperscripts[i])) {
@@ -2176,10 +2188,10 @@ deleteLangButton.addEventListener('click', () => {
                             const matchedTone = definedTones.find(t => t.number === foundToneNumber);
                             if (matchedTone) {
                                  toneMarker = (forDisplay && displayTonesInOrthography && !matchedTone.hideInOrthography) ? (matchedTone.representation || numericSuperscripts[i]) : "";
-                            } else { // Unmapped numeric tone, still display if allowed
+                            } else { // Unmapped numeric tone, still display if allowed.
                                  toneMarker = (forDisplay && displayTonesInOrthography) ? numericSuperscripts[i] : "";
                             }
-                            baseWord = baseWord.slice(0, -1);
+                            baseWord = baseWord.slice(0, -1); // Remove tone from baseWord
                             break;
                         }
                     }
@@ -2189,8 +2201,9 @@ deleteLangButton.addEventListener('click', () => {
             let transliterated = '';
             let remainingWord = baseWord;
         
+            // Handle custom writing system first.
             if (writingSystem === 'custom' && customSymbols && customSymbols.length > 0) {
-                const sortedSymbols = [...customSymbols].sort((a, b) => b.sound.length - a.sound.length); 
+                const sortedSymbols = [...customSymbols].sort((a, b) => b.sound.length - a.sound.length); // Longest sound first for matching.
                 while (remainingWord.length > 0) {
                     let foundMatch = false;
                     for (const sym of sortedSymbols) {
@@ -2201,56 +2214,99 @@ deleteLangButton.addEventListener('click', () => {
                             break;
                         }
                     }
-                    if (!foundMatch) { 
+                    if (!foundMatch) { // If no custom symbol matches, append the character as is.
                         transliterated += remainingWord[0];
                         remainingWord = remainingWord.substring(1);
                     }
                 }
             } else if (writingSystem === 'latin' && graphemeMappings && graphemeMappings.length > 0) {
+                // Handle Latin-based system with grapheme mappings.
+                // Sort mappings by sound length (longest first) to ensure correct matching (e.g., "sh" before "s").
                 const sortedMappings = [...graphemeMappings].sort((a, b) => b.sound.length - a.sound.length);
-                let currentOriginalPos = 0; 
+                let currentOriginalPos = 0; // Track position in the original baseWord for context (initial/final).
                 
                 while (remainingWord.length > 0) {
                     let foundMatch = false;
-                    for (const gm of sortedMappings) {
-                        if (remainingWord.startsWith(gm.sound)) {
-                            let graphemesToUse = [];
+                    for (const gm of sortedMappings) { // Iterate through each grapheme mapping.
+                        if (remainingWord.startsWith(gm.sound)) { // If the current sound in mapping matches the start of remainingWord.
+                            let potentialGraphemes = []; // List of possible graphemes to choose from for this sound.
+                            
+                            // Determine context of the sound.
                             const isInitial = currentOriginalPos === 0;
-                            const isFinal = (currentOriginalPos + gm.sound.length === baseWord.length); 
-                            const isVowelSound = vowels.includes(gm.sound);
+                            const isFinal = (currentOriginalPos + gm.sound.length === baseWord.length);
+                            const isConsonantSound = (currentLanguage.phonology.consonants || []).includes(gm.sound);
+                            const isVowelSound = (currentLanguage.phonology.vowels || []).includes(gm.sound);
 
-                            if (isInitial && gm.initialGraphemes && gm.initialGraphemes.length > 0) {
-                                graphemesToUse = gm.initialGraphemes;
-                            } else if (isFinal && gm.finalGraphemes && gm.finalGraphemes.length > 0 && !isVowelSound) {
-                                graphemesToUse = gm.finalGraphemes;
-                            } else if (isVowelSound && gm.vowelGraphemes && gm.vowelGraphemes.length > 0) { 
-                                graphemesToUse = gm.vowelGraphemes;
-                            } else { 
-                                 graphemesToUse = [...(gm.vowelGraphemes || []), ...(gm.initialGraphemes || []), ...(gm.finalGraphemes || [])].filter(Boolean);
+                            // Select appropriate grapheme list based on sound type and position.
+                            // This implements the "สุ่มแยกพยัญชนะต้นกับพยัญชนะสะกด ห้ามนำมารวมกัน"
+                            if (isConsonantSound) {
+                                if (isInitial && gm.initialGraphemes && gm.initialGraphemes.length > 0) {
+                                    potentialGraphemes = gm.initialGraphemes;
+                                } else if (isFinal && gm.finalGraphemes && gm.finalGraphemes.length > 0) {
+                                    potentialGraphemes = gm.finalGraphemes;
+                                } else if (gm.initialGraphemes && gm.initialGraphemes.length > 0) { // Medial consonant: prefer initial form.
+                                    potentialGraphemes = gm.initialGraphemes;
+                                } else if (gm.vowelGraphemes && gm.vowelGraphemes.length > 0) { // Unlikely fallback for consonant.
+                                    potentialGraphemes = gm.vowelGraphemes;
+                                } else if (gm.finalGraphemes && gm.finalGraphemes.length > 0) { // Further fallback.
+                                     potentialGraphemes = gm.finalGraphemes;
+                                }
+                            } else if (isVowelSound) {
+                                if (gm.vowelGraphemes && gm.vowelGraphemes.length > 0) {
+                                    potentialGraphemes = gm.vowelGraphemes;
+                                } else if (isInitial && gm.initialGraphemes && gm.initialGraphemes.length > 0) { // Vowel with initial form (e.g., /a/ as 'ha').
+                                    potentialGraphemes = gm.initialGraphemes;
+                                } else if (isFinal && gm.finalGraphemes && gm.finalGraphemes.length > 0) { // Vowel with final form (e.g., /a/ as 'ah').
+                                    potentialGraphemes = gm.finalGraphemes;
+                                } else if (gm.initialGraphemes && gm.initialGraphemes.length > 0) { // Medial vowel fallback if no specific vowelGraphemes.
+                                     potentialGraphemes = gm.initialGraphemes;
+                                }
+                            }
+
+                            // If no specific positional graphemes were chosen, use any graphemes defined for the sound.
+                            if (potentialGraphemes.length === 0) {
+                                const allDefined = [
+                                    ...(gm.initialGraphemes || []),
+                                    ...(gm.vowelGraphemes || []),
+                                    ...(gm.finalGraphemes || [])
+                                ].filter(Boolean); // filter(Boolean) removes empty strings if any.
+                                if (allDefined.length > 0) {
+                                    potentialGraphemes = allDefined;
+                                }
                             }
                             
-                            if (graphemesToUse.length > 0) {
-                                // MODIFIED: Randomly pick one grapheme
-                                transliterated += graphemesToUse[Math.floor(Math.random() * graphemesToUse.length)];
+                            let chosenGrapheme = null;
+                            if (potentialGraphemes.length > 0) {
+                                // Implement "ระบบไวยากรณ์การผันอัตโนมัตินั้นให้ใช้รูปอักขวิธีรูปแรกเสมอ"
+                                if (useFirstGraphemeOnly) {
+                                    chosenGrapheme = potentialGraphemes[0]; // Select the first grapheme for deterministic output.
+                                } else {
+                                    chosenGrapheme = potentialGraphemes[Math.floor(Math.random() * potentialGraphemes.length)]; // Otherwise, select randomly.
+                                }
+                            }
+
+                            if (chosenGrapheme) {
+                                transliterated += chosenGrapheme;
                                 remainingWord = remainingWord.substring(gm.sound.length);
                                 currentOriginalPos += gm.sound.length; 
                                 foundMatch = true;
-                                break;
+                                break; // Move to next segment of remainingWord.
                             }
                         }
                     }
-                    if (!foundMatch) { 
+                    if (!foundMatch) { // If no grapheme mapping applies or sound not in mappings, append char as is.
                         transliterated += remainingWord[0];
                         remainingWord = remainingWord.substring(1);
                         currentOriginalPos += 1;
                     }
                 }
-            } else { 
+            } else { // If neither custom nor Latin with mappings, assume direct phoneme-to-grapheme (usually just the phoneme itself).
                 transliterated = baseWord;
             }
         
-            return transliterated + toneMarker;
+            return transliterated + toneMarker; // Append the determined tone marker.
         }
+
 
         function generateAndDisplayWords() {
             const minSyllables = parseInt(document.getElementById('minSyllables').value);
@@ -2276,7 +2332,9 @@ deleteLangButton.addEventListener('click', () => {
                 }
                 
                 const detailedPhonetics = autoFormatDetailedPhonetics(finalPhoneticWord, currentLanguage.phonology);
-                const displayWord = transliterateWordToSymbols(finalPhoneticWord); 
+                 // For word generation, use random grapheme selection (default behavior of getOrthographicForm)
+                const displayWord = getOrthographicForm({word: finalPhoneticWord, customOrthography: null});
+
 
                 let randomMeaning = "";
                 if (apiThaiMeaningsDatabase.length > 0) {
@@ -2671,7 +2729,8 @@ deleteLangButton.addEventListener('click', () => {
         
             const conjugationSection = document.createElement('div');
             conjugationSection.className = 'p-3 border border-purple-300 rounded-md bg-purple-50';
-            conjugationSection.innerHTML = `<h3 class="text-lg font-semibold text-purple-700 mb-3">การผันคำ (Inflections/Conjugations)</h3>`;
+            conjugationSection.innerHTML = `<h3 class="text-lg font-semibold text-purple-700 mb-3">การผันคำ (Inflections/Conjugations)</h3>
+                                            <p class="text-xs text-gray-500 mb-2">เมื่อระบบแสดงตารางการผันคำอัตโนมัติ หากเสียงหนึ่งมีหลายรูปเขียน ระบบจะเลือกใช้รูปเขียน "รูปแรก" ที่กำหนดไว้ใน Grapheme Mappings เสมอ เพื่อให้ผลลัพธ์การผันมีความสม่ำเสมอ</p>`;
         
             const catMgmtSection = document.createElement('div');
             catMgmtSection.innerHTML = `<h4 class="font-medium text-purple-600 mb-2">1. จัดการประเภทการผัน (Inflection Categories)</h4>`;
@@ -3288,12 +3347,14 @@ deleteLangButton.addEventListener('click', () => {
                     const manualInflection = wordEntry.manualInflections ? wordEntry.manualInflections[manualInflectionKey] : null;
                     
                     let inflectedPhoneticForm = wordEntry.word; 
-                    let inflectedOrthographicForm = getOrthographicForm(wordEntry); 
+                    let inflectedOrthographicForm; // Will be determined below
                     let isManual = false;
 
                     if (manualInflection && manualInflection.phonetic) { 
                         inflectedPhoneticForm = manualInflection.phonetic;
-                        inflectedOrthographicForm = manualInflection.orthographic || transliterateWordToSymbols(inflectedPhoneticForm); 
+                        // For manual overrides, customOrthography field of the manualInflection should be used if present.
+                        // If not, transliterate the manual phonetic form (using first grapheme rule).
+                        inflectedOrthographicForm = manualInflection.orthographic || getOrthographicForm({word: inflectedPhoneticForm, customOrthography: null}, true, true);
                         isManual = true;
                     } else {
                         const rule = currentLanguage.grammar.morphology.conjugationRules.find(r =>
@@ -3302,7 +3363,12 @@ deleteLangButton.addEventListener('click', () => {
                         );
                         if (rule) { // Rule itself contains ruleSteps
                             inflectedPhoneticForm = applyInflectionRuleDefinition(wordEntry.word, rule); // Use the new function
-                            inflectedOrthographicForm = transliterateWordToSymbols(inflectedPhoneticForm);
+                            // For rule-generated forms, use the first grapheme rule for consistency.
+                            inflectedOrthographicForm = getOrthographicForm({word: inflectedPhoneticForm, customOrthography: null}, true, true);
+                        } else {
+                            // No rule, no manual override: show base form, transliterated with first grapheme rule.
+                            inflectedPhoneticForm = wordEntry.word;
+                            inflectedOrthographicForm = getOrthographicForm({word: wordEntry.word, customOrthography: null}, true, true);
                         }
                     }
                     
@@ -3407,7 +3473,8 @@ deleteLangButton.addEventListener('click', () => {
                     );
                     if (rule) ruleBasedPhonetic = applyInflectionRuleDefinition(word.word, rule);
                     
-                    const ruleBasedOrthographic = transliterateWordToSymbols(ruleBasedPhonetic);
+                    // Rule-based orthographic form using the first grapheme rule for consistency.
+                    const ruleBasedOrthographic = getOrthographicForm({word: ruleBasedPhonetic, customOrthography: null}, true, true);
                     
                     const initialOrthoValue = currentManualOverride?.orthographic || ruleBasedOrthographic;
                     const initialPhoneticValue = currentManualOverride?.phonetic || ruleBasedPhonetic; 
