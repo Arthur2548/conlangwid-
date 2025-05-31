@@ -642,7 +642,7 @@ deleteLangButton.addEventListener('click', () => {
             newLangData.lexicon = (newLangData.lexicon || []).map(word => ({
                 id: word.id || 0, 
                 word: word.word || '',
-                customOrthography: word.customOrthography === undefined ? null : word.customOrthography, // Ensure it's null by default if undefined
+                customOrthography: word.customOrthography || null,
                 phonetics: word.phonetics || '',
                 meaning: word.meaning || '',
                 partOfSpeech: word.partOfSpeech || '',
@@ -2139,27 +2139,26 @@ deleteLangButton.addEventListener('click', () => {
             document.getElementById('generateWordsButton').addEventListener('click', generateAndDisplayWords);
         }
 
-        // Function to get orthographic form.
-        // If forDisplay is true (default), it respects displayTonesInOrthography.
-        // If customOrthography is set, it's always used.
-        // Otherwise, transliterateWordToSymbols is called, *always* using the first grapheme for determinism.
-        function getOrthographicForm(wordEntry, forDisplay = true) {
+        // Function to get orthographic form, with an option to use the first grapheme for deterministic output
+        // (e.g., for consistent display in inflection tables)
+        function getOrthographicForm(wordEntry, forDisplay = true, useFirstGraphemeForAutoInflection = false) {
             if (!wordEntry) return "";
             // If a custom orthography is defined for the word, always use it.
             if (wordEntry.customOrthography) {
                 return wordEntry.customOrthography;
             }
-            // Otherwise, transliterate the base phonemic form, always using the first grapheme mapping choice for consistency.
-            // wordEntry.word is expected to be the base phonemic form.
+            // Otherwise, transliterate the base phonemic form.
+            // wordEntry.word is expected to be the base phonemic form including any tone markers.
             const basePhonemicForm = typeof wordEntry.word === 'string' ? wordEntry.word : '';
-            return transliterateWordToSymbols(basePhonemicForm, forDisplay, true); // Last argument true forces deterministic choice
+            // Pass the useFirstGraphemeForAutoInflection flag to transliterateWordToSymbols.
+            return transliterateWordToSymbols(basePhonemicForm, forDisplay, useFirstGraphemeForAutoInflection);
         }
 
 
         // Function to transliterate a phonemic word string into its orthographic representation based on current language settings.
         // Parameters:
         // - wordString: The phonemic string to transliterate.
-        // - forDisplay: Boolean, if true, considers displayTonesInOrthography.
+        // - forDisplay: Boolean, if true, considers displayTonesInOrthography. (Currently always true when called from getOrthographicForm)
         // - useFirstGraphemeOnly: Boolean, if true, selects the first available grapheme from mappings for determinism. Otherwise, selects randomly.
         function transliterateWordToSymbols(wordString, forDisplay = true, useFirstGraphemeOnly = false) {
             if (!wordString && typeof wordString !== 'string') return ""; 
@@ -2338,7 +2337,7 @@ deleteLangButton.addEventListener('click', () => {
                 const detailedPhonetics = autoFormatDetailedPhonetics(finalPhoneticWord, currentLanguage.phonology);
                 // For word generation list display, use random grapheme selection (useFirstGraphemeForAutoInflection = false).
                 // The specific generated displayWord will be passed to showWordModal if the user decides to add it.
-                const displayWord = transliterateWordToSymbols(finalPhoneticWord, true, false); // Use random for generation display here
+                const displayWord = getOrthographicForm({word: finalPhoneticWord, customOrthography: null}, true, false);
 
 
                 let randomMeaning = "";
@@ -3358,9 +3357,9 @@ deleteLangButton.addEventListener('click', () => {
 
                     if (manualInflection && manualInflection.phonetic) { 
                         inflectedPhoneticForm = manualInflection.phonetic;
-                        // For manual overrides, use the stored manual orthographic form if present,
-                        // otherwise, transliterate the manual phonetic form using deterministic rules.
-                        inflectedOrthographicForm = manualInflection.orthographic || getOrthographicForm({word: inflectedPhoneticForm, customOrthography: null}, true);
+                        // For manual overrides, customOrthography field of the manualInflection should be used if present.
+                        // If not, transliterate the manual phonetic form (using first grapheme rule).
+                        inflectedOrthographicForm = manualInflection.orthographic || getOrthographicForm({word: inflectedPhoneticForm, customOrthography: null}, true, true);
                         isManual = true;
                     } else {
                         const rule = currentLanguage.grammar.morphology.conjugationRules.find(r =>
@@ -3369,12 +3368,12 @@ deleteLangButton.addEventListener('click', () => {
                         );
                         if (rule) { // Rule itself contains ruleSteps
                             inflectedPhoneticForm = applyInflectionRuleDefinition(wordEntry.word, rule); // Use the new function
-                            // For rule-generated forms, use deterministic grapheme rule for consistency.
-                            inflectedOrthographicForm = getOrthographicForm({word: inflectedPhoneticForm, customOrthography: null}, true);
+                            // For rule-generated forms, use the first grapheme rule for consistency.
+                            inflectedOrthographicForm = getOrthographicForm({word: inflectedPhoneticForm, customOrthography: null}, true, true);
                         } else {
-                            // No rule, no manual override: show base form, transliterated with deterministic rule.
+                            // No rule, no manual override: show base form, transliterated with first grapheme rule.
                             inflectedPhoneticForm = wordEntry.word;
-                            inflectedOrthographicForm = getOrthographicForm({word: wordEntry.word, customOrthography: null}, true);
+                            inflectedOrthographicForm = getOrthographicForm({word: wordEntry.word, customOrthography: null}, true, true);
                         }
                     }
                     
@@ -3480,7 +3479,7 @@ deleteLangButton.addEventListener('click', () => {
                     if (rule) ruleBasedPhonetic = applyInflectionRuleDefinition(word.word, rule);
                     
                     // Rule-based orthographic form using the first grapheme rule for consistency.
-                    const ruleBasedOrthographic = getOrthographicForm({word: ruleBasedPhonetic, customOrthography: null}, true);
+                    const ruleBasedOrthographic = getOrthographicForm({word: ruleBasedPhonetic, customOrthography: null}, true, true);
                     
                     const initialOrthoValue = currentManualOverride?.orthographic || ruleBasedOrthographic;
                     const initialPhoneticValue = currentManualOverride?.phonetic || ruleBasedPhonetic; 
@@ -3960,7 +3959,7 @@ deleteLangButton.addEventListener('click', () => {
         }
 
 
-        window.showWordModal = (wordId = null, generatedWordPhoneticForm = null, generatedPhoneticsDetail = null, generatedMeaning = null, generatedDisplayWord = null) => {
+        window.showWordModal = (wordId = null, generatedWordPhoneticForm = null, generatedPhoneticsDetail = null, generatedMeaning = null) => {
             const existingWord = wordId ? currentLanguage.lexicon.find(w => w.id === wordId) : null;
             const modalId = 'wordEditModal';
             let modal = document.getElementById(modalId);
@@ -3971,9 +3970,7 @@ deleteLangButton.addEventListener('click', () => {
             modal.className = 'fixed inset-0 z-[70] flex items-center justify-center modal p-4'; 
 
             const initialWordValue = existingWord ? existingWord.word : (generatedWordPhoneticForm || '');
-            // For a new word, if generatedDisplayWord is provided (from word generator), use that as initial custom ortho.
-            // If existing word, use its customOrthography or empty string.
-            const initialCustomOrthography = existingWord ? (existingWord.customOrthography || '') : (generatedDisplayWord || '');
+            const initialCustomOrthography = existingWord ? (existingWord.customOrthography || '') : ''; // Ensure it's a string
             
             let initialPhonetics;
             if (existingWord && existingWord.phonetics) { initialPhonetics = existingWord.phonetics; } 
@@ -4013,10 +4010,10 @@ deleteLangButton.addEventListener('click', () => {
             modal.innerHTML = `
                 <div class="modal-content p-6 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                     <h3 class="text-xl font-bold mb-4">${existingWord ? 'แก้ไขคำศัพท์: ' + getOrthographicForm(existingWord) : 'เพิ่มคำศัพท์ใหม่'}</h3>
-                    <p class="text-xs text-gray-500 mb-2">รูปคำศัพท์ (รูปฐานเสียง) ควรเป็นรูปเสียงสุดท้ายหลังใช้กฎ Active Sound Changes และรวมเสียงวรรณยุกต์แล้ว (ถ้ามี)</p>
+                    <p class="text-xs text-gray-500 mb-2">รูปคำศัพท์ (รูปฐาน) ควรเป็นรูปเสียงสุดท้ายหลังใช้กฎ Active Sound Changes และรวมเสียงวรรณยุกต์แล้ว (ถ้ามี)</p>
                     <div class="space-y-3">
                         <div><label class="block text-sm font-medium">คำศัพท์ (รูปฐานเสียง):</label><input type="text" id="modalWord" value="${initialWordValue}" class="w-full p-2 border rounded-md font-mono"></div>
-                        <div><label class="block text-sm font-medium">คำศัพท์ (อักขรวิธี - กำหนดเอง):</label><input type="text" id="modalCustomOrthography" value="${initialCustomOrthography}" class="w-full p-2 border rounded-md font-mono" placeholder="ปล่อยว่างเพื่อใช้รูปเขียนจากกฎอัตโนมัติ (รูปแรก)"></div>
+                        <div><label class="block text-sm font-medium">คำศัพท์ (อักขรวิธี - กำหนดเอง ถ้าต้องการ):</label><input type="text" id="modalCustomOrthography" value="${initialCustomOrthography}" class="w-full p-2 border rounded-md font-mono" placeholder="ปล่อยว่างเพื่อใช้กฎอัตโนมัติ"></div>
                         <div><label class="block text-sm font-medium">การออกเสียง (Phonetics - รูปแบบละเอียด):</label><input type="text" id="modalPhonetics" value="${initialPhonetics}" class="w-full p-2 border rounded-md font-mono" placeholder="/พยางค์1.พยางค์2/"></div>
                         <div><label class="block text-sm font-medium">ความหมาย:</label><input type="text" id="modalMeaning" value="${initialMeaning}" class="w-full p-2 border rounded-md"></div>
                         <div>
@@ -4042,7 +4039,7 @@ deleteLangButton.addEventListener('click', () => {
                         <button id="saveWordModalBtn" class="btn-primary px-4 py-2 rounded-md">${existingWord ? 'บันทึกการเปลี่ยนแปลง' : 'เพิ่มคำศัพท์'}</button>
                     </div>
                 </div>`;
-              document.body.appendChild(modal);
+            document.body.appendChild(modal);
 
             const modalWordInput = modal.querySelector('#modalWord');
             const modalPhoneticsInput = modal.querySelector('#modalPhonetics');
